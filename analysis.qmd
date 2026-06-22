@@ -23,69 +23,61 @@ suppressPackageStartupMessages(library(tidyverse))
 
 In this report, we analyze the historical hurricane data from the NOAA Atlantic hurricane database (`dplyr::storms`). This dataset spans from 1975 to 2024 and tracks storm locations and characteristics.
 
-To understand trends in storm activity, we focus on **named storms** (tropical storms and hurricanes given official names), excluding unnamed tropical depressions (which are recorded using generic codes like "ALxxYYYY").
+To understand trends in storm activity, we focus on three major storm types: **tropical depressions**, **tropical storms**, and **hurricanes** (which can be named or unnamed).
 
-# Named Storms per Year
+# Storm Activity by Type
 
-The visualization below illustrates the annual count of unique named storms in the Atlantic basin. 
+The visualization below illustrates the annual count of unique storms in the Atlantic basin, categorized by their storm type.
 
 ```{r}
 #| label: plot-named-storms
-#| fig-cap: "Annual counts of named storms in the Atlantic Basin (1975-2024)."
+#| fig-cap: "Annual counts of storms by type in the Atlantic Basin (1975-2024)."
 #| warning: false
 #| message: false
 #| fig-width: 10
 #| fig-height: 5.5
 
-# Filter out unnamed/numbered depressions and calculate distinct storms per year
+# Filter out unnamed/numbered depressions and calculate distinct storms per year for the table
 named_storms <- storms %>%
   filter(!grepl("^(AL|Al)[0-9]", name)) %>%
   distinct(year, name) %>%
   count(year, name = "num_storms")
 
-# Calculate summary stats for annotations
-avg_storms <- mean(named_storms$num_storms)
-peak_year <- named_storms %>% 
-  slice_max(num_storms, n = 1, with_ties = FALSE)
+# Filter to tropical depressions, tropical storms, and hurricanes, and count distinct storms per year/status
+storm_types <- storms %>%
+  filter(status %in% c("tropical depression", "tropical storm", "hurricane")) %>%
+  mutate(status = factor(status, 
+                         levels = c("tropical depression", "tropical storm", "hurricane"),
+                         labels = c("Tropical Depression", "Tropical Storm", "Hurricane"))) %>%
+  distinct(year, name, status) %>%
+  count(year, status, name = "count") %>%
+  complete(year, status, fill = list(count = 0))
 
-# Generate a highly polished, interactive-feeling visualization
-ggplot(named_storms, aes(x = year, y = num_storms)) +
-  # Reference line for the historical average
-  geom_hline(yintercept = avg_storms, linetype = "dashed", color = "#94a3b8", size = 0.8) +
+# Generate a highly polished, interactive-feeling stacked area chart
+ggplot(storm_types, aes(x = year, y = count, fill = status)) +
+  # Stacked area chart with thin white borders for visual clarity
+  geom_area(color = "white", size = 0.25, alpha = 0.85) +
   
-  # Smooth gradient area underneath the line for modern aesthetics
-  geom_area(fill = "#818cf8", alpha = 0.15) +
-  
-  # The trend line
-  geom_line(color = "#4f46e5", size = 1.2, alpha = 0.85) +
-  
-  # Data points
-  geom_point(color = "#4f46e5", size = 2.5, alpha = 0.9) +
-  
-  # Highlight the peak year with a custom circle
-  geom_point(data = peak_year, aes(x = year, y = num_storms), 
-             color = "#ef4444", size = 4.5, stroke = 2, shape = 21, fill = "white") +
-  
-  # Add dynamic labels for the peak year and average line
-  geom_text(data = peak_year, 
-            aes(x = year - 1, y = num_storms + 1, 
-                label = paste0("Peak Year: ", year, " (", num_storms, " storms)")),
-            color = "#ef4444", fontface = "bold", size = 3.8, hjust = 1) +
-  
-  annotate("text", x = 1976, y = avg_storms + 0.9, 
-           label = paste0("Historical Average: ", round(avg_storms, 1)),
-           color = "#475569", fontface = "italic", size = 3.5, hjust = 0) +
+  # Custom color scale: light blue -> orange -> dark red
+  scale_fill_manual(
+    values = c(
+      "Tropical Depression" = "#93c5fd",
+      "Tropical Storm" = "#fb923c",
+      "Hurricane" = "#b91c1c"
+    )
+  ) +
   
   # Labels and scales
   labs(
-    title = "Annual Number of Named Storms (1975 - 2024)",
-    subtitle = "Analysis of NOAA Atlantic hurricane database",
+    title = "Annual Storm Activity by Type (1975 - 2024)",
+    subtitle = "Evolution of tropical depressions, tropical storms, and hurricanes in the Atlantic basin",
     x = "Year",
-    y = "Number of Named Storms",
+    y = "Number of Storms",
+    fill = "Storm Type",
     caption = "Source: NOAA HURDAT database (dplyr::storms)"
   ) +
-  scale_x_continuous(breaks = seq(1975, 2025, by = 5)) +
-  scale_y_continuous(breaks = seq(0, 35, by = 5), limits = c(0, 35)) +
+  scale_x_continuous(breaks = seq(1975, 2025, by = 5), expand = c(0, 0)) +
+  scale_y_continuous(breaks = seq(0, 80, by = 10), limits = c(0, 80), expand = c(0, 0)) +
   
   # Theme customization
   theme_minimal(base_family = "sans") +
@@ -100,6 +92,9 @@ ggplot(named_storms, aes(x = year, y = num_storms)) +
     panel.grid.minor.x = element_blank(),
     panel.grid.major.y = element_line(color = "#e2e8f0", size = 0.5),
     panel.grid.minor.y = element_blank(),
+    legend.position = "bottom",
+    legend.title = element_text(face = "bold", size = 10, color = "#475569"),
+    legend.text = element_text(size = 9, color = "#64748b"),
     plot.margin = margin(20, 20, 20, 20)
   )
 ```
