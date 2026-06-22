@@ -1,0 +1,123 @@
+---
+title: "Exploring Storms"
+author: "Hyder Ali"
+execute:
+  echo: false
+format:
+  html:
+    theme:
+      light: cosmo
+      dark: darkly
+    toc: true
+    toc-title: "Contents"
+    embed-resources: true
+---
+
+```{r}
+#| label: setup
+#| include: false
+suppressPackageStartupMessages(library(tidyverse))
+```
+
+# Introduction
+
+In this report, we analyze the historical hurricane data from the NOAA Atlantic hurricane database (`dplyr::storms`). This dataset spans from 1975 to 2024 and tracks storm locations and characteristics.
+
+To understand trends in storm activity, we focus on **named storms** (tropical storms and hurricanes given official names), excluding unnamed tropical depressions (which are recorded using generic codes like "ALxxYYYY").
+
+# Named Storms per Year
+
+The visualization below illustrates the annual count of unique named storms in the Atlantic basin. 
+
+```{r}
+#| label: plot-named-storms
+#| fig-cap: "Annual counts of named storms in the Atlantic Basin (1975-2024)."
+#| warning: false
+#| message: false
+#| fig-width: 10
+#| fig-height: 5.5
+
+# Filter out unnamed/numbered depressions and calculate distinct storms per year
+named_storms <- storms %>%
+  filter(!grepl("^(AL|Al)[0-9]", name)) %>%
+  distinct(year, name) %>%
+  count(year, name = "num_storms")
+
+# Calculate summary stats for annotations
+avg_storms <- mean(named_storms$num_storms)
+peak_year <- named_storms %>% 
+  slice_max(num_storms, n = 1, with_ties = FALSE)
+
+# Generate a highly polished, interactive-feeling visualization
+ggplot(named_storms, aes(x = year, y = num_storms)) +
+  # Reference line for the historical average
+  geom_hline(yintercept = avg_storms, linetype = "dashed", color = "#94a3b8", size = 0.8) +
+  
+  # Smooth gradient area underneath the line for modern aesthetics
+  geom_area(fill = "#818cf8", alpha = 0.15) +
+  
+  # The trend line
+  geom_line(color = "#4f46e5", size = 1.2, alpha = 0.85) +
+  
+  # Data points
+  geom_point(color = "#4f46e5", size = 2.5, alpha = 0.9) +
+  
+  # Highlight the peak year with a custom circle
+  geom_point(data = peak_year, aes(x = year, y = num_storms), 
+             color = "#ef4444", size = 4.5, stroke = 2, shape = 21, fill = "white") +
+  
+  # Add dynamic labels for the peak year and average line
+  geom_text(data = peak_year, 
+            aes(x = year - 1, y = num_storms + 1, 
+                label = paste0("Peak Year: ", year, " (", num_storms, " storms)")),
+            color = "#ef4444", fontface = "bold", size = 3.8, hjust = 1) +
+  
+  annotate("text", x = 1976, y = avg_storms + 0.9, 
+           label = paste0("Historical Average: ", round(avg_storms, 1)),
+           color = "#475569", fontface = "italic", size = 3.5, hjust = 0) +
+  
+  # Labels and scales
+  labs(
+    title = "Annual Number of Named Storms (1975 - 2024)",
+    subtitle = "Analysis of NOAA Atlantic hurricane database",
+    x = "Year",
+    y = "Number of Named Storms",
+    caption = "Source: NOAA HURDAT database (dplyr::storms)"
+  ) +
+  scale_x_continuous(breaks = seq(1975, 2025, by = 5)) +
+  scale_y_continuous(breaks = seq(0, 35, by = 5), limits = c(0, 35)) +
+  
+  # Theme customization
+  theme_minimal(base_family = "sans") +
+  theme(
+    plot.title = element_text(face = "bold", size = 16, color = "#1e293b", margin = margin(b = 4)),
+    plot.subtitle = element_text(size = 11, color = "#64748b", margin = margin(b = 15)),
+    plot.caption = element_text(size = 8, color = "#94a3b8", hjust = 1, margin = margin(t = 15)),
+    axis.title.x = element_text(face = "bold", size = 11, color = "#475569", margin = margin(t = 10)),
+    axis.title.y = element_text(face = "bold", size = 11, color = "#475569", margin = margin(r = 10)),
+    axis.text = element_text(color = "#64748b", size = 9.5),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major.y = element_line(color = "#e2e8f0", size = 0.5),
+    panel.grid.minor.y = element_blank(),
+    plot.margin = margin(20, 20, 20, 20)
+  )
+```
+
+# Storm Activity Table
+
+For details, here are the counts of named storms for the most recent 10 years of data:
+
+```{r}
+#| label: storm-table
+#| message: false
+
+named_storms %>%
+  filter(year >= 2015) %>%
+  arrange(desc(year)) %>%
+  knitr::kable(
+    col.names = c("Year", "Number of Named Storms"),
+    align = "cr",
+    caption = "Named Storm Counts (2015-2024)"
+  )
+```
